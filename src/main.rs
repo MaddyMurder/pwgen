@@ -1,7 +1,10 @@
 use clap::{Parser, Subcommand, Args};
 
 use arboard::Clipboard;
+
 use rand::seq::IndexedRandom;
+
+use rand::Rng;
 
 #[derive(Parser)]
 #[command(
@@ -26,7 +29,7 @@ enum Commands {
 #[derive(Args)]
 struct PasswordArgs {
     /// Amount of characters.
-    /// 16 by default
+    /// Defaults to 16.
     #[arg(short = 'l', long = "length")]
     length: Option<u32>,
     
@@ -37,7 +40,7 @@ struct PasswordArgs {
     character_sets: Option<Vec<CharSet>>,
     
     /// Exclude characters from the character sets.
-    /// /// Example usage: "--exclude abc!@#".
+    /// Example usage: "--exclude abc!@#".
     #[arg(short = 'e', long = "exclude")]
     excluded_chars: Option<String>,
     
@@ -90,22 +93,23 @@ const SYMBOL: &'static [char] = &[
 
 #[derive(Args)]
 struct UsernameArgs {
-    /// Amount of numbers after the username
-    /// 4 by default
+    /// Amount of numbers after the username.
+    /// Defaults to 2.
     #[arg(short = 'n', long = "numbers")]
     numbers: Option<u32>,
     
-    /// Character in between the two username words
+    /// Character in between the words and numbers.
+    /// Don't specify to omit it.
     #[arg(short = 'c', long = "word-char")]
     word_char: Option<char>,
     
-    /// Disables copying the final password to clipboard
+    /// Disables copying the final password to clipboard.
     #[arg(short = 'N', long = "no-copy")]
     copy_disabled: bool,
 }
 
-const OBJECT_LIST_RAW: &'static str = include_str!("../data/object.txt");
 const ADJECTIVE_LIST_RAW: &'static str = include_str!("../data/adjective.txt");
+const OBJECT_LIST_RAW: &'static str = include_str!("../data/object.txt");
 
 fn get_word_list(list: &'static str) -> Vec<&'static str> {
     list
@@ -117,7 +121,7 @@ fn main() {
     let cli = Cli::parse();
     
     let mut copy_to_clipboard = true;
-    let mut final_string: String = "".into();
+    let mut final_output: String = "".into();
     let mut rng = rand::rng();
     
     match &cli.command {
@@ -127,15 +131,14 @@ fn main() {
                 copy_to_clipboard = false;
             }
             
-            
-            let used_character_sets: &Vec<CharSet> = if let Some(selected_character_sets) = &args.character_sets {
-                &selected_character_sets
+            let chosen_character_sets: &Vec<CharSet> = if let Some(user_character_sets) = &args.character_sets {
+                &user_character_sets
             } else {
                 &vec![CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol] // Use default.
             };
             
             let mut all_characters: Vec<char> = Vec::new();
-            for character_set in used_character_sets {
+            for character_set in chosen_character_sets {
                 all_characters.extend(get_char_set(character_set));
             }
             
@@ -152,8 +155,8 @@ fn main() {
             
             let mut password_length = 16;
             if let Some(new_length) = args.length {
-                if new_length > 16384 {
-                    println!("Password too long! Cannot be longer than 16384.");
+                if new_length > 65536 {
+                    println!("Password too long! Cannot be longer than 65536.");
                     return;
                 }
                 password_length = new_length;
@@ -161,7 +164,7 @@ fn main() {
             
             for _ in 0..password_length {
                 let random_char = all_characters.choose(&mut rng).unwrap();
-                final_string.push(*random_char);
+                final_output.push(*random_char);
             }
         }
         
@@ -170,16 +173,44 @@ fn main() {
                 copy_to_clipboard = false;
             }
             
+            let first_random_word = *get_word_list(ADJECTIVE_LIST_RAW).choose(&mut rng).expect("ADJECTIVE WORD LIST EMPTY. BINARY CORRUPTED!");
+            let second_random_word = *get_word_list(OBJECT_LIST_RAW).choose(&mut rng).expect("OBJECT WORD LIST EMPTY. BINARY CORRUPTED!");
             
+            let chosen_word_char = if let Some(user_word_char) = args.word_char {
+                user_word_char.to_string()
+            } else {
+                "".into()
+            };
+            
+            final_output = format!("{}{}{}", first_random_word, chosen_word_char, second_random_word);
+            
+            let chosen_number_amount = if let Some(user_number_amount) = args.numbers {
+                if user_number_amount > 65536 {
+                    println!("Too many numbers! Cannot be more than 65536.");
+                }
+                user_number_amount
+            } else {
+                2 // Default number amount.
+            };
+            
+            if chosen_number_amount > 0 {
+                final_output = format!("{}{}", final_output, chosen_word_char)
+            }
+            
+            for _ in 0..chosen_number_amount {
+                final_output = format!("{}{}", final_output, rng.random_range(0..10));
+            }
         }
     }
     
-    println!("{}", final_string);
+    println!("{}", final_output);
     
     if copy_to_clipboard {
         if let Ok(mut clipboard) = Clipboard::new() {
-            let clipboard_success = clipboard.set_text(final_string);
-            if clipboard_success.is_err() {
+            let clipboard_success = clipboard.set_text(final_output);
+            if clipboard_success.is_ok() {
+                println!("Copied to clipboard.");
+            } else {
                 println!("Unable to copy to clipboard.");
             }
         } else {
