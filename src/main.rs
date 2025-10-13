@@ -9,11 +9,11 @@ use once_cell::sync::Lazy;
     author,
     version,
     override_usage = "pwgen.exe <COMMAND> [ARGS]",
-    subcommand_required(true),
+    subcommand_required(false),
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -32,7 +32,7 @@ struct PasswordArgs {
     length: Option<u32>,
     
     /// All the character sets used in the password.
-    /// By default this is all of them.
+    /// By default this is set to all available.
     /// Example usage: "--char-set lower,upper,digits".
     #[arg(short = 'c', long = "char-set", value_enum, value_delimiter = ',')]
     character_sets: Option<Vec<CharSet>>,
@@ -43,32 +43,14 @@ struct PasswordArgs {
     excluded_chars: Option<String>,
     
     
-    /// Disables copying the final password to clipboard.
-    #[arg(short = 'n', long = "no-copy")]
+    /// Disables copying the password to clipboard.
+    #[arg(short = 'o', long = "no-copy")]
     copy_disabled: bool,
+    
+    /// Disables showing the password generated
+    #[arg(short = 'i', long = "no-hide")]
+    hide_disabled: bool,
 }
-
-#[derive(clap::ValueEnum, Clone)]
-enum CharSet {
-    Lower,
-    Upper,
-    Digits,
-    Symbol,
-}
-
-fn get_char_set (sets: &CharSet) -> &'static str {
-    match sets {
-        CharSet::Lower => LOWER,
-        CharSet::Upper => UPPER,
-        CharSet::Digits => DIGITS,
-        CharSet::Symbol => SYMBOL,
-    }
-}
-
-const LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
-const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const DIGITS: &str = "0123456789";
-const SYMBOL: &str = "!@#$%^&*()-_=+[]{}:;.,?~";
 
 #[derive(Args)]
 struct UsernameArgs {
@@ -82,10 +64,35 @@ struct UsernameArgs {
     #[arg(short = 'c', long = "word-char")]
     word_char: Option<char>,
     
-    /// Disables copying the final password to clipboard.
+    /// Disables copying the username to clipboard.
     #[arg(short = 'n', long = "no-copy")]
     copy_disabled: bool,
 }
+
+
+#[derive(clap::ValueEnum, Clone)]
+enum CharSet {
+    Lower,
+    Upper,
+    Digits,
+    Symbol,
+}
+
+fn get_char_set (sets: &CharSet) -> &'static str {
+    match sets {
+        CharSet::Lower => LOWER_CHARS,
+        CharSet::Upper => UPPER_CHARS,
+        CharSet::Digits => DIGITS_CHARS,
+        CharSet::Symbol => SPECIAL_CHARS,
+    }
+}
+
+const ALL_CHAR_SETS: [CharSet; 4] = [CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol];
+
+const LOWER_CHARS: &str = "abcdefghijklmnopqrstuvwxyz";
+const UPPER_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DIGITS_CHARS: &str = "0123456789";
+const SPECIAL_CHARS: &str = "!@#$%^&*()-_=+[]{}:;.,?~";
 
 const ADJECTIVE_LIST_RAW: &str = include_str!("../data/adjective.txt");
 const OBJECT_LIST_RAW: &str = include_str!("../data/object.txt");
@@ -103,10 +110,12 @@ fn main() {
     let mut copy_to_clipboard = true;
     let mut final_output: String = "".into();
     let mut rng = rand::rng();
+    let is_password: bool;
     
-    match &cli.command {
+    match &cli.command.unwrap_or(Commands::Password(PasswordArgs { length: None, character_sets: None, excluded_chars: None, copy_disabled: false, hide_disabled: false })) {
         
         Commands::Password( args ) => {
+            is_password = true;
             if args.copy_disabled {
                 copy_to_clipboard = false;
             }
@@ -114,7 +123,7 @@ fn main() {
             let chosen_character_sets: &[CharSet] = if let Some(user_character_sets) = &args.character_sets {
                 user_character_sets
             } else {
-                &[CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol] // Use default.
+                &ALL_CHAR_SETS // Use default.
             };
             
             let mut all_characters: Vec<char> = Vec::new();
@@ -146,9 +155,14 @@ fn main() {
                 let random_char = all_characters.choose(&mut rng).unwrap();
                 final_output.push(*random_char);
             }
+            
+            if args.hide_disabled {
+                println!("{}", final_output);
+            }
         }
         
         Commands::Username( args ) => {
+            is_password = false;
             if args.copy_disabled {
                 copy_to_clipboard = false;
             }
@@ -181,16 +195,21 @@ fn main() {
             for _ in 0..chosen_number_amount {
                 final_output.push_str(&rng.random_range(0..10).to_string());
             }
+            
+            
+            println!("{}", final_output);
         }
     }
-    
-    println!("{}", final_output);
     
     if copy_to_clipboard {
         if let Ok(mut clipboard) = Clipboard::new() {
             let clipboard_success = clipboard.set_text(final_output);
             if clipboard_success.is_ok() {
-                println!("Copied to clipboard.");
+                if is_password {
+                    println!("Password copied to clipboard.");
+                } else {
+                    println!("Username copied to clipboard.");
+                }
             } else {
                 println!("Unable to copy to clipboard.");
             }

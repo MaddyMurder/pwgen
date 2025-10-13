@@ -85,7 +85,6 @@ big
 biodegradable
 bitesized
 bitter
-black
 bland
 blank
 blaring
@@ -111,7 +110,6 @@ brilliant
 brisk
 broken
 bronze
-brown
 bruised
 bubbly
 bulky
@@ -1190,7 +1188,6 @@ wet
 whimsical
 whirlwind
 whispered
-white
 whole
 whopping
 wicked
