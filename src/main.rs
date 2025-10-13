@@ -1,10 +1,8 @@
 use clap::{Parser, Subcommand, Args};
-
 use arboard::Clipboard;
-
 use rand::seq::IndexedRandom;
-
 use rand::Rng;
+use once_cell::sync::Lazy;
 
 #[derive(Parser)]
 #[command(
@@ -58,44 +56,25 @@ enum CharSet {
     Symbol,
 }
 
-fn get_char_set (sets: &CharSet) -> Vec<char> {
+fn get_char_set (sets: &CharSet) -> &'static str {
     match sets {
-        CharSet::Lower => {
-            LOWER.to_vec()
-        }
-        CharSet::Upper => {
-            UPPER.to_vec()
-        }
-        CharSet::Digits => {
-            DIGITS.to_vec()
-        }
-        CharSet::Symbol => {
-            SYMBOL.to_vec()
-        }
+        CharSet::Lower => LOWER,
+        CharSet::Upper => UPPER,
+        CharSet::Digits => DIGITS,
+        CharSet::Symbol => SYMBOL,
     }
 }
 
-const LOWER: &'static [char] = &[
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
-];
-const UPPER: &'static [char] = &[
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
-];
-const DIGITS: &'static [char] = &[
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-];
-const SYMBOL: &'static [char] = &[
-    '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '=', '+', '[', ']',
-    '{', '}', ':', ';', '.', ',', '?', '~'
-];
+const LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
+const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DIGITS: &str = "0123456789";
+const SYMBOL: &str = "!@#$%^&*()-_=+[]{}:;.,?~";
 
 #[derive(Args)]
 struct UsernameArgs {
     /// Amount of numbers after the username.
     /// Defaults to 2.
-    #[arg(short = 'n', long = "numbers")]
+    #[arg(short = 'N', long = "numbers")]
     numbers: Option<u32>,
     
     /// Character in between the words and numbers.
@@ -104,18 +83,19 @@ struct UsernameArgs {
     word_char: Option<char>,
     
     /// Disables copying the final password to clipboard.
-    #[arg(short = 'N', long = "no-copy")]
+    #[arg(short = 'n', long = "no-copy")]
     copy_disabled: bool,
 }
 
-const ADJECTIVE_LIST_RAW: &'static str = include_str!("../data/adjective.txt");
-const OBJECT_LIST_RAW: &'static str = include_str!("../data/object.txt");
+const ADJECTIVE_LIST_RAW: &str = include_str!("../data/adjective.txt");
+const OBJECT_LIST_RAW: &str = include_str!("../data/object.txt");
 
-fn get_word_list(list: &'static str) -> Vec<&'static str> {
-    list
-        .lines()
-        .collect()
-}
+static ADJECTIVE_LIST: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    ADJECTIVE_LIST_RAW.lines().collect()
+});
+static OBJECT_LIST: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    OBJECT_LIST_RAW.lines().collect()
+});
 
 fn main() {
     let cli = Cli::parse();
@@ -131,19 +111,19 @@ fn main() {
                 copy_to_clipboard = false;
             }
             
-            let chosen_character_sets: &Vec<CharSet> = if let Some(user_character_sets) = &args.character_sets {
-                &user_character_sets
+            let chosen_character_sets: &[CharSet] = if let Some(user_character_sets) = &args.character_sets {
+                user_character_sets
             } else {
-                &vec![CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol] // Use default.
+                &[CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol] // Use default.
             };
             
             let mut all_characters: Vec<char> = Vec::new();
             for character_set in chosen_character_sets {
-                all_characters.extend(get_char_set(character_set));
+                all_characters.extend(get_char_set(character_set).chars());
             }
             
             if let Some(excluded_chars) = &args.excluded_chars {
-                for excluded_char in excluded_chars.chars().collect::<Vec<char>>() {
+                for excluded_char in excluded_chars.chars() {
                     all_characters.retain(|&c| c != excluded_char);
                 }
             }
@@ -173,13 +153,13 @@ fn main() {
                 copy_to_clipboard = false;
             }
             
-            let first_random_word = *get_word_list(ADJECTIVE_LIST_RAW).choose(&mut rng).expect("ADJECTIVE WORD LIST EMPTY. BINARY CORRUPTED!");
-            let second_random_word = *get_word_list(OBJECT_LIST_RAW).choose(&mut rng).expect("OBJECT WORD LIST EMPTY. BINARY CORRUPTED!");
+            let first_random_word = *ADJECTIVE_LIST.choose(&mut rng).expect("Adjective word list empty. This is a build error!");
+            let second_random_word = *OBJECT_LIST.choose(&mut rng).expect("Object word list empty. This is a build error!");
             
             let chosen_word_char = if let Some(user_word_char) = args.word_char {
                 user_word_char.to_string()
             } else {
-                "".into()
+                String::new()
             };
             
             final_output = format!("{}{}{}", first_random_word, chosen_word_char, second_random_word);
@@ -187,6 +167,7 @@ fn main() {
             let chosen_number_amount = if let Some(user_number_amount) = args.numbers {
                 if user_number_amount > 65536 {
                     println!("Too many numbers! Cannot be more than 65536.");
+                    return;
                 }
                 user_number_amount
             } else {
@@ -194,11 +175,11 @@ fn main() {
             };
             
             if chosen_number_amount > 0 {
-                final_output = format!("{}{}", final_output, chosen_word_char)
+                final_output.push_str(&chosen_word_char);
             }
             
             for _ in 0..chosen_number_amount {
-                final_output = format!("{}{}", final_output, rng.random_range(0..10));
+                final_output.push_str(&rng.random_range(0..10).to_string());
             }
         }
     }
