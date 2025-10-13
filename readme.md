@@ -1,6 +1,6 @@
 # PWGEN
 
-A simple CLI password generator written in Rust.
+A simple CLI password/username generator written in rust
 
 ## Features
 
