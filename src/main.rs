@@ -32,7 +32,7 @@ struct PasswordArgs {
     length: Option<u32>,
     
     /// All the character sets used in the password.
-    /// By default this is set to all available.
+    /// By default this is set to all non-rare sets available.
     /// Example usage: "--char-set lower,upper,digits".
     #[arg(short = 'c', long = "char-set", value_enum, value_delimiter = ',')]
     character_sets: Option<Vec<CharSet>>,
@@ -76,6 +76,7 @@ enum CharSet {
     Upper,
     Digits,
     Symbol,
+    RareSymbol,
 }
 
 fn get_char_set (sets: &CharSet) -> &'static str {
@@ -84,15 +85,17 @@ fn get_char_set (sets: &CharSet) -> &'static str {
         CharSet::Upper => UPPER_CHARS,
         CharSet::Digits => DIGITS_CHARS,
         CharSet::Symbol => SPECIAL_CHARS,
+        CharSet::RareSymbol => SPECIAL_RARE_CHARS,
     }
 }
 
-const ALL_CHAR_SETS: [CharSet; 4] = [CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol];
+const DEFAULT_CHAR_SETS: [CharSet; 4] = [CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol];
 
 const LOWER_CHARS: &str = "abcdefghijklmnopqrstuvwxyz";
 const UPPER_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS_CHARS: &str = "0123456789";
-const SPECIAL_CHARS: &str = "!@#$%^&*()-_=+[]{}:;.,?~";
+const SPECIAL_CHARS: &str = "!@#$%^&*-_=+()[]{}<>:;,.?~";
+const SPECIAL_RARE_CHARS: &str = "/\\\'\"|` ";
 
 const ADJECTIVE_LIST_RAW: &str = include_str!("../data/adjective.txt");
 const OBJECT_LIST_RAW: &str = include_str!("../data/object.txt");
@@ -123,7 +126,7 @@ fn main() {
             let chosen_character_sets: &[CharSet] = if let Some(user_character_sets) = &args.character_sets {
                 user_character_sets
             } else {
-                &ALL_CHAR_SETS // Use default.
+                &DEFAULT_CHAR_SETS // Use default.
             };
             
             let mut all_characters: Vec<char> = Vec::new();
