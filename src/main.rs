@@ -47,7 +47,7 @@ struct PasswordArgs {
     #[arg(short = 'o', long = "no-copy")]
     copy_disabled: bool,
     
-    /// Disables showing the password generated
+    /// Disables hiding the password generated
     #[arg(short = 'i', long = "no-hide")]
     hide_disabled: bool,
 }
@@ -75,8 +75,8 @@ enum CharSet {
     Lower,
     Upper,
     Digits,
-    Symbol,
-    RareSymbol,
+    Symbols,
+    RareSymbols,
 }
 
 fn get_char_set (sets: &CharSet) -> &'static str {
@@ -84,12 +84,12 @@ fn get_char_set (sets: &CharSet) -> &'static str {
         CharSet::Lower => LOWER_CHARS,
         CharSet::Upper => UPPER_CHARS,
         CharSet::Digits => DIGITS_CHARS,
-        CharSet::Symbol => SPECIAL_CHARS,
-        CharSet::RareSymbol => SPECIAL_RARE_CHARS,
+        CharSet::Symbols => SPECIAL_CHARS,
+        CharSet::RareSymbols => SPECIAL_RARE_CHARS,
     }
 }
 
-const DEFAULT_CHAR_SETS: [CharSet; 4] = [CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbol];
+const DEFAULT_CHAR_SETS: [CharSet; 4] = [CharSet::Lower, CharSet::Upper, CharSet::Digits, CharSet::Symbols];
 
 const LOWER_CHARS: &str = "abcdefghijklmnopqrstuvwxyz";
 const UPPER_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -126,7 +126,7 @@ fn main() {
             let chosen_character_sets: &[CharSet] = if let Some(user_character_sets) = &args.character_sets {
                 user_character_sets
             } else {
-                &DEFAULT_CHAR_SETS // Use default.
+                &DEFAULT_CHAR_SETS // Use default
             };
             
             let mut all_characters: Vec<char> = Vec::new();
@@ -188,7 +188,7 @@ fn main() {
                 }
                 user_number_amount
             } else {
-                2 // Default number amount.
+                2 // Default number amount
             };
             
             if chosen_number_amount > 0 {
